@@ -16,10 +16,20 @@
         
 
         document.getElementById("create-button").addEventListener("click", function() {
+            var dlcontainer = document.getElementById("dlcontainer")
+            var links = dlcontainer.getElementsByClassName("downloadlink")
+          
+            while(dlcontainer.firstChild) {
+                dlcontainer.removeChild(dlcontainer.lastChild)
+            }
+
             getZipFileBlob().then(downloadFile);
         });
             
          async function getZipFileBlob() {
+            
+            
+
           const zipWriter = new ZipWriter(new BlobWriter());
 
           const flist = [
