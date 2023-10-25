@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PanDoc Ref Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    
+    <script type="module">
+        import {
+          BlobWriter,
+          HttpReader,
+          TextReader,
+          ZipWriter,
+        } from "./zipjs/zip.js/index.js"; //from "https://unpkg.com/@zip.js/zip.js/index.js";
+        
+
+        document.getElementById("create-button").addEventListener("click", function() {
+            getZipFileBlob().then(downloadFile);
+        });
+            
+         async function getZipFileBlob() {
+          const zipWriter = new ZipWriter(new BlobWriter());
+
+          const flist = [
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "docProps/app.xml",
+            "docProps/core.xml",
+            "docProps/custom.xml",
+            "word/document.xml",
+            "word/fontTable.xml",
+            "word/footnotes.xml",
+            "word/comments.xml",
+            "word/numbering.xml",
+            "word/settings.xml",
+            "word/webSettings.xml",
+            "word/_rels/document.xml.rels",
+            "word/_rels/footnotes.xml.rels",
+            ]
+
+          var promlist = []
+          for (let index = 0; index < flist.length; index++) {
+            const element = flist[index];
+            promlist.push(zipWriter.add(element, new HttpReader("./src/"+element)))
+          }
+
+          const parser = new DOMParser();
+
+          const response = await fetch("./src/word/theme/theme1.xml");
+          const body = await response.text()
+          var xmlDoc = parser.parseFromString(body,"text/xml");
+          
+
+          let colors = document.getElementsByClassName("themecolor");
+          for (let i = 0; i < colors.length; i++) {
+            const c = colors[i]
+            //console.log(c.id,c.value)
+
+
+            //<a:srgbClr="http://schemas.openxmlformats.org/drawingml/2006/main" val="1F497D"/>
+            var cel = xmlDoc.getElementsByTagName("a:"+c.id)[0]
+
+            var rgbclr = xmlDoc.createElement("a:srgbClr")
+            rgbclr.setAttribute("xmlns:a","http://schemas.openxmlformats.org/drawingml/2006/main")
+            rgbclr.setAttribute("val",c.value.replace("#",""))
+            while (cel.firstChild) {
+                cel.removeChild(cel.lastChild);
+            }
+            cel.appendChild(rgbclr)
+
+            //console.log(cel)
+          }
+
+          let fonts = document.getElementsByClassName("themefont");
+          for (let i = 0; i < fonts.length; i++) {
+            const c = fonts[i]
+            //console.log(c.id,c.value)
+
+
+            //<a:majorFont>
+            //<a:latin typeface="Calibri" />
+            var h = xmlDoc.getElementsByTagName("a:"+c.id)[0]
+            var latin = h.getElementsByTagName("a:latin")[0]
+            latin.setAttribute("typeface",c.value)
+
+            //console.log(h)
+          }
+
+        
+          const themeupd = new XMLSerializer().serializeToString(xmlDoc)
+          //console.log(themeupd)
+          promlist.push(zipWriter.add("word/theme/theme1.xml",new TextReader(themeupd)));
+
+          const responseSt = await fetch("./src/word/styles.xml");
+          const bodySt = await responseSt.text()
+          var xmlDoc = parser.parseFromString(bodySt,"text/xml");
+
+          let headings = [1,2,3,4,5,6,7,8,9].map((v)=> "Heading"+v)
+          headings.push("BodyText")
+          let styles = xmlDoc.getElementsByTagName("w:style")
+
+
+          headings.forEach(h=> {
+             var style = null
+             for(let i = 0;i <styles.length;i++) {
+                const s = styles[i]
+                if (s.getAttribute("w:styleId") == h) {
+                    style = s
+                } 
+             }
+             if (style != null) {
+                var rprs = style.getElementsByTagName("w:rPr")
+                var rpr = null
+                if (rprs.length > 0) {
+                    rpr = rprs[0]
+                } else {
+                    rpr = xmlDoc.createElement("w:rPr")
+                    style.appendChild(rpr)
+                }
+
+
+                var rm = ["w:color","w:sz","w:szCs","w:b","w:bCs","w:i","w:iCs"]
+                rm.forEach((r)=>{
+                    var q = rpr.getElementsByTagName(r)
+                    if (q.length > 0) {
+                        rpr.removeChild(q[0])
+                    }
+                })
+                //<w:color w:val="4F81BD" w:themeColor="accent1" />
+                //<w:sz w:val="24" />
+                //<w:szCs w:val="24" />
+                //<w:b />
+                //<w:bCs />
+                //<w:i />
+                //<w:iCs />
+
+                var color = xmlDoc.createElement("w:color")
+                color.setAttribute("w:themeColor",document.getElementById(h+"color").value)
+                rpr.appendChild(color)
+
+                //Specifies the font size in half points: <w:sz w:val="28"/>. Note that szCs is used for complex script fonts such as Arabic.
+                //http://officeopenxml.com/WPtextFormatting.php
+                const hp = document.getElementById(h+"sz").value
+
+                var sz = xmlDoc.createElement("w:sz")
+                sz.setAttribute("w:val",hp*2)
+                rpr.appendChild(sz)
+
+                var sz = xmlDoc.createElement("w:szCs")
+                sz.setAttribute("w:val",hp*2)
+                rpr.appendChild(sz)
+
+
+                const bc = document.getElementById(h+"b").checked
+                if (bc) {
+                    var b = xmlDoc.createElement("w:b")
+                    rpr.appendChild(b)
+                    b = xmlDoc.createElement("w:bCs")
+                    rpr.appendChild(b)
+                }
+
+                const ic = document.getElementById(h+"i").checked
+                if (ic) {
+                    var i = xmlDoc.createElement("w:i")
+                    rpr.appendChild(i)
+                    i = xmlDoc.createElement("w:iCs")
+                    rpr.appendChild(i)
+                }
+                //console.log(style)
+
+             } else {
+                console.log("not found",h)
+             }
+          })
+
+
+          const styleupd = new XMLSerializer().serializeToString(xmlDoc)
+
+
+          //console.log(styleupd)
+          promlist.push(zipWriter.add("word/styles.xml",new TextReader(styleupd)));
+
+          await Promise.all(promlist);
+          return zipWriter.close();
+        }
+        
+         function downloadFile(blob) {
+            var dlcontainer = document.getElementById("dlcontainer")
+            var  links = dlcontainer.getElementsByClassName("downloadlink")
+          
+            for (let i = 0; i < links.length; i++) {
+                dlcontainer.removeChild(links[i])
+            }
+            dlcontainer.appendChild(Object.assign(document.createElement("a"), {
+                download: document.getElementById("filename-input").value,
+                href: URL.createObjectURL(blob),
+                textContent: "Download docx file",
+                className: "downloadlink",
+            }));
+        }
+
+       
+            </script>
+            <script>
+                function HSLToHex(h,s,l) {
+                    s /= 100;
+                    l /= 100;
+
+                    let c = (1 - Math.abs(2 * l - 1)) * s,
+                        x = c * (1 - Math.abs((h / 60) % 2 - 1)),
+                        m = l - c/2,
+                        r = 0,
+                        g = 0, 
+                        b = 0; 
+
+                    if (0 <= h && h < 60) {
+                        r = c; g = x; b = 0;
+                    } else if (60 <= h && h < 120) {
+                        r = x; g = c; b = 0;
+                    } else if (120 <= h && h < 180) {
+                        r = 0; g = c; b = x;
+                    } else if (180 <= h && h < 240) {
+                        r = 0; g = x; b = c;
+                    } else if (240 <= h && h < 300) {
+                        r = x; g = 0; b = c;
+                    } else if (300 <= h && h < 360) {
+                        r = c; g = 0; b = x;
+                    }
+                    // Having obtained RGB, convert channels to hex
+                    r = Math.round((r + m) * 255).toString(16);
+                    g = Math.round((g + m) * 255).toString(16);
+                    b = Math.round((b + m) * 255).toString(16);
+
+                    // Prepend 0s, if necessary
+                    if (r.length == 1)
+                        r = "0" + r;
+                    if (g.length == 1)
+                        g = "0" + g;
+                    if (b.length == 1)
+                        b = "0" + b;
+
+                    return "#" + r + g + b;
+                }
+                function load() {
+                    const rowname = document.getElementById("rowname")
+
+                    colors = [
+                        {x:"dk1",l:"Dark Color 1",h:"#000000"},
+                        {x:"lt1",l:"Light Color 1",h:"#ffffff"},
+                        {x:"dk2",l:"Dark Color 2",h:"#333333"},
+                        {x:"lt2",l:"Light Color 2",h:"#eeeeee"},
+                        {x:"accent1",l:"Accent 1",h:HSLToHex((160),80,50)},
+                        {x:"accent2",l:"Accent 2",h:HSLToHex((0),80,50)},
+                        {x:"accent3",l:"Accent 3",h:HSLToHex((40),80,50)},
+                        {x:"accent4",l:"Accent 4",h:HSLToHex((80),80,50)},
+                        {x:"accent5",l:"Accent 5",h:HSLToHex((120),80,50)},
+                        {x:"accent6",l:"Accent 6",h:HSLToHex((200),80,50)},
+                        {x:"hlink",l:"Link",h:HSLToHex((240),80,50)},
+                        {x:"folHlink",l:"Follow Link",h:HSLToHex((280),80,50)},
+                    ]
+/*<div class="row" id="rowname">
+    <div class="col-md-3" >
+                <span class="form-label">set file name</span>
+              </div>
+              <div class="col">
+                <input type="text" id="filename-input" value="reference.docx">
+              </div>
+        </div>*/
+                    colors.forEach(color => {
+                        var row = document.createElement("div")
+                        row.setAttribute("class","row")
+
+                        var col = document.createElement("div")
+                        col.setAttribute("class","col-md-3")
+
+                        var span = document.createElement("span")
+                        span.innerHTML = color.l+"&nbsp;"
+                        span.setAttribute("class","form-label")
+
+                        col.appendChild(span)
+                        row.appendChild(col)
+
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-md-3")
+
+                        var input = document.createElement("input")
+                        input.setAttribute("value",color.h)
+                        input.setAttribute("type","color")
+                        input.setAttribute("class","themecolor")
+                        input.setAttribute("id",color.x)
+
+                        col.appendChild(input)
+                        row.appendChild(col)
+                        document.getElementById("frm").insertBefore(row,rowname)
+                    });
+
+                    fonts = [
+                        {x:"majorFont",l:"Major Font",h:"Tahoma"},
+                        {x:"minorFont",l:"Minor Font",h:"Tahoma"},
+                    ]
+
+                    fonts.forEach(font => {
+                        var row = document.createElement("div")
+                        row.setAttribute("class","row")
+
+                        var col = document.createElement("div")
+                        col.setAttribute("class","col-md-3")
+
+                        var span = document.createElement("span")
+                        span.innerHTML = font.l+"&nbsp;"
+                        span.setAttribute("class","form-label")
+
+                        col.appendChild(span)
+                        row.appendChild(col)
+
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-md-3")
+
+                        var input = document.createElement("input")
+                        input.setAttribute("value",font.h)
+                        input.setAttribute("type","text")
+                        input.setAttribute("class","themefont")
+                        input.setAttribute("id",font.x)
+
+                        col.appendChild(input)
+                        row.appendChild(col)
+
+                        document.getElementById("frm").insertBefore(row,rowname)
+                    });
+
+                    headings = [
+                        {x:"BodyText",l:"BodyText",h:{sz:11,color:"dk1",b:false,i:false}},
+                        {x:"Heading1",l:"Heading 1",h:{sz:45,color:"dk1",b:false,i:false}},
+                        {x:"Heading2",l:"Heading 2",h:{sz:36,color:"dk1",b:false,i:false}},
+                        {x:"Heading3",l:"Heading 3",h:{sz:23,color:"accent1",b:false,i:false}},
+                        {x:"Heading4",l:"Heading 4",h:{sz:20,color:"accent1",b:false,i:false}},
+                        {x:"Heading5",l:"Heading 5",h:{sz:16,color:"accent1",b:false,i:false}},
+                        {x:"Heading6",l:"Heading 6",h:{sz:13,color:"accent1",b:true,i:false}},
+                        {x:"Heading7",l:"Heading 7",h:{sz:13,color:"accent1",b:false,i:false}},
+                        {x:"Heading8",l:"Heading 8",h:{sz:12,color:"accent1",b:true,i:false}},
+                        {x:"Heading9",l:"Heading 9",h:{sz:12,color:"accent1",b:false,i:false}},
+                    ]
+
+                    headings.forEach(heading=> {
+                        var row = document.createElement("div")
+                        row.setAttribute("class","row")
+
+                        var col = document.createElement("div")
+                        col.setAttribute("class","col-sm-3")
+
+                        var span = document.createElement("span")
+                        span.innerHTML = heading.l+"&nbsp;"
+                        span.setAttribute("class","form-label")
+
+                        col.appendChild(span)
+                        row.appendChild(col)
+
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-2")
+
+                        var input = document.createElement("input")
+                        input.setAttribute("value",heading.h.sz)
+                        input.setAttribute("type","text")
+                        input.setAttribute("id",heading.x+"sz")
+                        col.appendChild(input)
+                        row.appendChild(col)
+                        
+
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-2")
+                        var selcol = document.createElement("select")
+                        
+                        selcol.setAttribute("id",heading.x+"color")
+                        colors.forEach(c=> {
+                            var opt = document.createElement("option")
+                            opt.setAttribute("value",c.x)
+                            if (c.x == heading.h.color) {
+                                opt.setAttribute("selected",true)
+                            }
+                            opt.innerText = c.l
+                            selcol.appendChild(opt)
+                        })
+                        col.appendChild(selcol)
+                        row.appendChild(col)
+
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-1")
+
+                        span = document.createElement("span"); span.innerHTML = "bold ";col.append(span);
+                        input = document.createElement("input")
+                        if (heading.h.b) {
+                            input.setAttribute("checked",true)
+                        }
+                        input.setAttribute("type","checkbox")
+                        input.setAttribute("id",heading.x+"b")
+                        col.appendChild(input)
+                        row.appendChild(col)
+
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-1")
+
+                        span = document.createElement("span"); span.innerHTML = "italic ";col.append(span);
+                        input = document.createElement("input")
+                        if (heading.h.i) {
+                            input.setAttribute("checked",true)
+                        }
+                        input.setAttribute("type","checkbox")
+                        input.setAttribute("id",heading.x+"i")
+                        col.appendChild(input)
+                        row.appendChild(col)
+
+                        document.getElementById("frm").insertBefore(row,rowname)
+                    });
+                    
+                }
+            </script>
+</head>
+  <body onload="load();">
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <div class="container" id="frm">
+        <div>
+            <h1>Create a reference docx</h1>
+        </div>
+        <div class="row" id="rowname">
+            <div class="col-md-3" >
+                <span class="form-label">set file name</span>
+              </div>
+              <div class="col">
+                <input type="text" id="filename-input" value="reference.docx">
+              </div>
+        </div>
+        <div class="row" id="rowname">
+            <div class="col-md-3" >
+                <span class="form-label">create the docx file</span>
+              </div>
+              <div class="col">
+                <button id="create-button" >Create</button>
+              </div>
+        </div>
+        <div style="margin: 20px;"></div>
+        <div id="dlcontainer">
+
+        </div>
+        <div>
+            <p>Made with <a href="https://github.com/gildas-lormeau/">zipfs</a></p>
+        </div>
+    </div>   
+    
+    
+    
+</body>
+</html>
