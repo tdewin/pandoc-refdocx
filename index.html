@@ -42,9 +42,10 @@
           var promlist = []
           for (let index = 0; index < flist.length; index++) {
             const element = flist[index];
-            var reader = new HttpReader("./src/"+element)
-            await reader
-            promlist.push(zipWriter.add(element, reader))
+            const response = await fetch("./src/"+element)
+            const body = await response.text()
+
+            promlist.push(zipWriter.add(element, new TextReader(body)))
           }
 
           const parser = new DOMParser();
