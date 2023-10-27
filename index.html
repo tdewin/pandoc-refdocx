@@ -48,10 +48,30 @@
             "word/webSettings.xml",
             "word/_rels/document.xml.rels",
             "word/_rels/footnotes.xml.rels",
+            "word/theme/theme1.xml",
+            "word/styles.xml",
             ]
+
+          const modAfter = ["word/theme/theme1.xml","word/styles.xml","word/document.xml"]
 
           var parralelFetch = {}
           var promlist = []
+
+
+          const createOrReturnFirst = function (doc,parent,tagname) {
+            var multi = parent.getElementsByTagName(tagname)
+            if (multi.length > 0) {
+                return multi[0]
+            } else {
+                var e = doc.createElement(tagname)
+                parent.appendChild(e)
+                return e
+            }
+          }
+
+          const idVal = function(id) {
+            return document.getElementById(id).value
+          }
 
           for (let index = 0; index < flist.length; index++) {
             const element = flist[index];
@@ -65,16 +85,25 @@
           promlist = []
           for (let index = 0; index < flist.length; index++) {
             const element = flist[index];
-            //console.log(element)
-            const response = await parralelFetch[element]
-            const body = await response.text()
+            if (!modAfter.includes(element)) {
+                //console.log(element)
+                const response = await parralelFetch[element]
+                const body = await response.text()
 
-            promlist.push(zipWriter.add(element, new TextReader(body)))
+                promlist.push(zipWriter.add(element, new TextReader(body)))
+            }
+
           }
 
           const parser = new DOMParser();
 
-          const response = await fetch("./src/word/theme/theme1.xml");
+
+          //
+          // changing theme
+          //
+          //
+          //
+          const response = await parralelFetch["word/theme/theme1.xml"]
           const body = await response.text()
           var xmlDoc = parser.parseFromString(body,"text/xml");
           
@@ -120,8 +149,60 @@
           const themeupd = new XMLSerializer().serializeToString(xmlDoc)
           //console.log(themeupd)
           promlist.push(zipWriter.add("word/theme/theme1.xml",new TextReader(themeupd)));
+            
+          
+          //
+          // changing document.xml
+          //
+          //
+          //
+          const responseDoc = await parralelFetch["word/document.xml"]
+          const bodyDoc = await responseDoc.text()
+          var xmlDoc = parser.parseFromString(bodyDoc,"text/xml");
 
-          const responseSt = await fetch("./src/word/styles.xml");
+          /* a4
+          <w:sectPr w:rsidR="0012706A" w:rsidSect="009B42DC">
+            <w:pgSz w:w="11906" w:h="16838"/>
+            
+            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+            <w:cols w:space="720"/>
+            <w:docGrid w:linePitch="326"/>
+          </w:sectPr>
+            us letter
+            w:w="12240" w:h="15840"
+          */
+
+          var ptm = parseInt(idVal("ptmulti"))
+
+          var docbody = createOrReturnFirst(xmlDoc,xmlDoc,"w:body")
+          var sectpr = createOrReturnFirst(xmlDoc,docbody,"w:sectPr")
+          var pgsz = createOrReturnFirst(xmlDoc,sectpr,"w:pgSz")
+
+          pgsz.setAttribute("w:w",parseFloat(idVal("docSizeW")*ptm))
+          pgsz.setAttribute("w:h",parseFloat(idVal("docSizeH")*ptm))
+          pgsz.setAttribute("w:orient",idVal("docSizeO"))
+
+
+          var pgMar = createOrReturnFirst(xmlDoc,sectpr,"w:pgMar")
+          pgMar.setAttribute("w:top",parseFloat(idVal("docSizeMT")*ptm))
+          pgMar.setAttribute("w:bottom",parseFloat(idVal("docSizeMB")*ptm))
+          pgMar.setAttribute("w:left",parseFloat(idVal("docSizeML")*ptm))
+          pgMar.setAttribute("w:right",parseFloat(idVal("docSizeMR")*ptm))
+          pgMar.setAttribute("w:header",parseFloat(idVal("docSizeMH")*ptm))
+          pgMar.setAttribute("w:footer",parseFloat(idVal("docSizeMF")*ptm))
+
+
+          const docupd = new XMLSerializer().serializeToString(xmlDoc)
+          //console.log(docupd)
+          promlist.push(zipWriter.add("word/document.xml",new TextReader(docupd)));
+
+          //
+          // changing styles.xml
+          //
+          //
+          //
+
+          const responseSt = await parralelFetch["word/styles.xml"]
           const bodySt = await responseSt.text()
           var xmlDoc = parser.parseFromString(bodySt,"text/xml");
 
@@ -136,83 +217,23 @@
           }
         
           if (allstyles["Title"] && document.getElementById("titlebeforeUpdate").checked) {
-            var pprs = allstyles["Title"].getElementsByTagName("w:pPr")
-            var ppr = null
-
-            if (pprs.length > 0) {
-                    ppr = pprs[0]
-            } else {
-                ppr = xmlDoc.createElement("w:pPr")
-                style.appendChild(ppr)
-            }
-
-            var spacings = ppr.getElementsByTagName("w:spacing")
-            var spacing = null
-            if (spacings.length > 0) {
-                spacing = spacings[0]
-            } else {
-                var spacing = xmlDoc.createElement("w:spacing")
-                ppr.appendChild(spacing)
-            }
-            spacing.setAttribute("w:before",parseInt(document.getElementById("titlebefore").value)*20)
+            var ppr = createOrReturnFirst(xmlDoc,allstyles["Title"],"w:pPr")
+            var spacing = createOrReturnFirst(xmlDoc,ppr,"w:spacing")
+            spacing.setAttribute("w:before",parseInt(document.getElementById("titlebefore").value)*ptm)
           }
 
-          if(allstyles["TOCHeading"] && document.getElementById("tocpagebreakUpdate").checked ) {
-            var pprs = allstyles["TOCHeading"].getElementsByTagName("w:pPr")
-            var ppr = null
 
-            if (pprs.length > 0) {
-                    ppr = pprs[0]
-            } else {
-                ppr = xmlDoc.createElement("w:pPr")
-                style.appendChild(ppr)
+          const pageBreakBefore = function(style,toggle) {
+            if(allstyles[style] && document.getElementById(toggle).checked ) {
+                var ppr = createOrReturnFirst(xmlDoc,allstyles[style],"w:pPr")
+                createOrReturnFirst(xmlDoc,ppr,"w:pageBreakBefore")
             }
+          } 
+          pageBreakBefore("TOCHeading","tocpagebreakUpdate")
+          pageBreakBefore("Heading1","h1pagebreakUpdate")
+          pageBreakBefore("AbstractTitle","abstractpagebreakUpdate")
+        
 
-            var pbbs = ppr.getElementsByTagName("w:pageBreakBefore")
-            if (pbbs.length == 0) {
-                var pbb = xmlDoc.createElement("w:pageBreakBefore")
-                ppr.appendChild(pbb)
-            }
-            
-          }
-
-          if(allstyles["Heading1"] && document.getElementById("h1pagebreakUpdate").checked ) {
-            var pprs = allstyles["Heading1"].getElementsByTagName("w:pPr")
-            var ppr = null
-
-            if (pprs.length > 0) {
-                    ppr = pprs[0]
-            } else {
-                ppr = xmlDoc.createElement("w:pPr")
-                style.appendChild(ppr)
-            }
-
-            var pbbs = ppr.getElementsByTagName("w:pageBreakBefore")
-            if (pbbs.length == 0) {
-                var pbb = xmlDoc.createElement("w:pageBreakBefore")
-                ppr.appendChild(pbb)
-            }
-            
-          }
-
-          if(allstyles["AbstractTitle"] && document.getElementById("abstractpagebreakUpdate").checked ) {
-            var pprs = allstyles["AbstractTitle"].getElementsByTagName("w:pPr")
-            var ppr = null
-
-            if (pprs.length > 0) {
-                    ppr = pprs[0]
-            } else {
-                ppr = xmlDoc.createElement("w:pPr")
-                style.appendChild(ppr)
-            }
-
-            var pbbs = ppr.getElementsByTagName("w:pageBreakBefore")
-            if (pbbs.length == 0) {
-                var pbb = xmlDoc.createElement("w:pageBreakBefore")
-                ppr.appendChild(pbb)
-            }
-            
-          }
 
           headings.forEach(h=> {
             //1 is minorfont, 2 is majorfont for headings
@@ -225,23 +246,8 @@
              var style = allstyles[h]
              
              if (style != null) {
-                var rprs = style.getElementsByTagName("w:rPr")
-                var rpr = null
-                if (rprs.length > 0) {
-                    rpr = rprs[0]
-                } else {
-                    rpr = xmlDoc.createElement("w:rPr")
-                    style.appendChild(rpr)
-                }
-
-                var pprs = style.getElementsByTagName("w:pPr")
-                var ppr = null
-                if (pprs.length > 0) {
-                    ppr = pprs[0]
-                } else {
-                    ppr = xmlDoc.createElement("w:pPr")
-                    style.appendChild(ppr)
-                }
+                var rpr = createOrReturnFirst(xmlDoc,style,"w:rPr")
+                var ppr = createOrReturnFirst(xmlDoc,style,"w:pPr")
                 
                 var rm = ["w:color","w:sz","w:szCs","w:b","w:bCs","w:i","w:iCs","w:u"]
                 rm.forEach((r)=>{
@@ -302,22 +308,8 @@
 
                 const jc  = document.getElementById(h+"j").value
                 if (jc != "default") {
-                    var wjcs = ppr.getElementsByTagName("w:jc")
-                
-                    if (wjcs.length > 0) {
-                        wjcs[0].setAttribute("w:val",jc)
-                    } else {
-                        var wjc = xmlDoc.createElement("w:jc")
-                        wjc.setAttribute("w:val",jc)
-                        ppr.appendChild(wjc)
-                    }
-
-                    /*var spacing = ppr.getElementsByTagName("w:spacing")
-                    if (spacing.length > 0) {
-                        spacing[0].setAttribute("w:before",0)
-                        spacing[0].setAttribute("w:after",0)
-                    } */
-
+                    var wjc = createOrReturnFirst(xmlDoc,ppr,"w:jc")
+                    wjc.setAttribute("w:val",jc)
                 }
                 
                 
@@ -381,6 +373,60 @@
        
             </script>
             <script>
+                function byId(id) {
+                    return document.getElementById(id)
+                }
+                function idVal(id,v) {
+                    var e = byId(id)
+                    if (v !== undefined) {
+                        e.value = v
+                    }
+                    return e.value
+                }
+                function idValI(id,v) {
+                    return parseInt(idVal(id,v))
+                }
+                function idValF(id,v) {
+                    return parseFloat(idVal(id,v))
+                }
+
+                function swPt(e) {
+                    var m = 20
+                    
+                    if(idValI("ptmulti") == 20) {
+                        m = 1/20
+                       
+                    } 
+                    var l = ["docSizeH","docSizeW","docSizeMB","docSizeMT","docSizeML","docSizeMR","docSizeMH","docSizeMF","titlebefore"]
+                    l.forEach(l=>{
+                        idValF(l,Math.round(idValF(l)*m,2))
+                    })
+                }
+
+                //function to switch between portait mode and landscape
+                function sw() {
+                    var t = idVal("docSizeH")
+                    idVal("docSizeH",idVal("docSizeW"))
+                    idVal("docSizeW",t)
+
+                    var e = byId("docSizeO")
+                    var opts = e.getElementsByTagName("option")
+                    if(idVal("docSizeO") == opts[0].value) {
+                        opts[1].selected = true
+                    } else {
+                        opts[0].selected = true
+                    }
+                }
+                function szSel() {
+                    var t = idVal("docSizeFormat").split("x")
+                    idVal("docSizeH",t[1]/idValI("ptmulti"))
+                    idVal("docSizeW",t[0]/idValI("ptmulti"))
+                    var e = byId("docSizeO")
+                    var opts = e.getElementsByTagName("option")
+                    opts[parseInt(t[2])].selected = true
+                }
+
+                
                 function HSLToHex(h,s,l) {
                     s /= 100;
                     l /= 100;
@@ -420,6 +466,15 @@
 
                     return "#" + r + g + b;
                 }
+
+                function createNewElement(parent,eltype,attrs) {
+                        var el = document.createElement(eltype)
+                        for (const [key, value] of Object.entries(attrs)) {
+                            el.setAttribute(key,value)
+                        }
+                        parent.appendChild(el)
+                        return el
+                }
                 function load() {
                     const rowname = document.getElementById("rowname")
 
@@ -442,27 +497,13 @@
                         var row = document.createElement("div")
                         row.setAttribute("class","row mt-2")
 
-                        var col = document.createElement("div")
-                        col.setAttribute("class","col-md-3")
-
-                        var span = document.createElement("span")
+                        var col = createNewElement(row,"div",{class:"col-sm-2"})
+                        var span = createNewElement(col,"span",{class:"form-label"})
                         span.innerHTML = color.l+"&nbsp;"
-                        span.setAttribute("class","form-label")
+                  
+                        col = createNewElement(row,"div",{class:"col-sm-2"})
+                        createNewElement(col,"input",{value:color.h,type:"color",class:"themecolor form-control",id:color.x})
 
-                        col.appendChild(span)
-                        row.appendChild(col)
-
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-md-3")
-
-                        var input = document.createElement("input")
-                        input.setAttribute("value",color.h)
-                        input.setAttribute("type","color")
-                        input.setAttribute("class","themecolor")
-                        input.setAttribute("id",color.x)
-
-                        col.appendChild(input)
-                        row.appendChild(col)
                         document.getElementById("frm").insertBefore(row,rowname)
                     });
 
@@ -478,27 +519,12 @@
                         var row = document.createElement("div")
                         row.setAttribute("class","row mt-2")
 
-                        var col = document.createElement("div")
-                        col.setAttribute("class","col-md-3 form-group")
-
-                        var span = document.createElement("span")
+                        var col = createNewElement(row,"div",{class:"col-sm-2"})
+                        var span = createNewElement(col,"span",{class:"form-label"})
                         span.innerHTML = font.l+"&nbsp;"
-                        span.setAttribute("class","form-label")
 
-                        col.appendChild(span)
-                        row.appendChild(col)
-
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-md-3")
-
-                        var input = document.createElement("input")
-                        input.setAttribute("value",font.h)
-                        input.setAttribute("type","text")
-                        input.setAttribute("class","themefont form-input")
-                        input.setAttribute("id",font.x)
-
-                        col.appendChild(input)
-                        row.appendChild(col)
+                        col = createNewElement(row,"div",{class:"col-sm-2"})
+                        createNewElement(col,"input",{value:font.h,type:"text",class:"themefont form-control",id:font.x})
 
                         document.getElementById("frm").insertBefore(row,rowname)
                     });
@@ -528,146 +554,96 @@
                         var row = document.createElement("div")
                         row.setAttribute("class","row mt-2")
 
-                        var col = document.createElement("div")
-                        col.setAttribute("class","col-sm-2 form-group")
-
-                        var span = document.createElement("span")
+                        var col = createNewElement(row,"div",{class:"col-sm-2"})
+                        var span = createNewElement(col,"span",{class:"form-label"})
                         span.innerHTML = heading.l+"&nbsp;"
-                        span.setAttribute("class","form-label")
-
-                        col.appendChild(span)
-                        row.appendChild(col)
-
 
                         //size
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-1")
+                        col = createNewElement(row,"div",{class:"col-sm-1"})
+                        createNewElement(col,"input",{value:heading.h.sz,type:"number",class:"form-control",id:heading.x+"sz"})
 
-                        var input = document.createElement("input")
-                        input.setAttribute("value",heading.h.sz)
-                        input.setAttribute("type","number")
-                        input.setAttribute("id",heading.x+"sz")
-                        input.setAttribute("class","form-control")
-                        col.appendChild(input)
-                        row.appendChild(col)
+                    
                         
 
                         // Colors
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-2")
-                        var selcol = document.createElement("select")
+                        col = createNewElement(row,"div",{class:"col-sm-2"})
+                        var selcol = createNewElement(col,"select",{class:"form-control",id:heading.x+"color"})
                         
-                        selcol.setAttribute("id",heading.x+"color")
-                        selcol.setAttribute("class","form-control")
                         colors.forEach(c=> {
-                            var opt = document.createElement("option")
-                            opt.setAttribute("value",c.x)
+                            var opt = createNewElement(selcol,"option",{value:c.x})
                             if (c.x == heading.h.color) {
                                 opt.setAttribute("selected",true)
                             }
                             opt.innerText = c.l
-                            selcol.appendChild(opt)
                         })
-                        col.appendChild(selcol)
-                        row.appendChild(col)
+
+                       
 
                         // Fonts
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-2")
-                        var selcol = document.createElement("select")
+                        col = createNewElement(row,"div",{class:"col-sm-2"})
+                        var selcol = createNewElement(col,"select",{class:"form-control",id:heading.x+"font"})
                         
-                        selcol.setAttribute("id",heading.x+"font")
-                        selcol.setAttribute("class","form-control")
-                        var opt = document.createElement("option")
-                        opt.setAttribute("value","default")
-                        if (heading.h.f === undefined) {
-                            opt.setAttribute("selected",true)
-                        }
+                        
+                        var opt = createNewElement(selcol,"option",{value:"default",selected:(heading.h.f === undefined)})
                         opt.innerText = "Default"
-                        selcol.appendChild(opt)
+                       
                         fonts.forEach(f=> {
-                            var opt = document.createElement("option")
-                            opt.setAttribute("value",f.x)
+                            var opt = createNewElement(selcol,"option",{value:f.x})
                             opt.innerText = f.l
-                            selcol.appendChild(opt)
                             if (heading.h.f !== undefined && f.x == heading.h.f) {
                                 opt.setAttribute("selected",true)
                             }
                         })
-                        col.appendChild(selcol)
-                        row.appendChild(col)
+   
 
 
                         // Justify
                         //http://officeopenxml.com/WPalignment.php
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-2")
-                        var selcol = document.createElement("select")
+                        col = createNewElement(row,"div",{class:"col-sm-2"})
+                        var selcol = createNewElement(col,"select",{class:"form-control",id:heading.x+"j"})
                         
-                        selcol.setAttribute("id",heading.x+"j")
-                        selcol.setAttribute("class","form-control")
                         const sel = (heading.h.jc)?heading.h.jc:"default"
                         const list = ["default","start","end","center","both","distribute"]
                         
                     
                         list.forEach(f=> {
-                            var opt = document.createElement("option")
+                            var opt = createNewElement(selcol,"option",{value:f})
                             if(f == sel) {
                                 opt.setAttribute("selected",(sel == f))
                             }
-                            opt.setAttribute("value",f)
                             opt.innerText = f
-                            selcol.appendChild(opt)
                         })
-                        col.appendChild(selcol)
-                        row.appendChild(col)
+ 
 
 
                         //check bold
-
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-1")
-
-                        
-                        input = document.createElement("input")
-                        input.setAttribute("class","form-check-input")
+                        col = createNewElement(row,"div",{class:"col-sm-1"})
+                        var input = createNewElement(col,"input",{value:heading.h.sz,type:"checkbox",class:"form-check-input",id:heading.x+"b"})
                         if (heading.h.b) {
                             input.setAttribute("checked",true)
                         }
-                        input.setAttribute("type","checkbox")
-                        input.setAttribute("id",heading.x+"b")
-                        col.appendChild(input)
-                        row.appendChild(col)
-                        span = document.createElement("span"); span.innerHTML = "bold ";col.append(span);
+                        var span = createNewElement(col,"span",{}); 
+                        span.innerHTML = " bold";
 
                         //check italic
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-1")
-                        input = document.createElement("input")
-                        input.setAttribute("class","form-check-input")
+                        col = createNewElement(row,"div",{class:"col-sm-1"})
+                        var input = createNewElement(col,"input",{value:heading.h.sz,type:"checkbox",class:"form-check-input",id:heading.x+"i"})
                         if (heading.h.i) {
                             input.setAttribute("checked",true)
                         }
-                        input.setAttribute("type","checkbox")
-                        input.setAttribute("id",heading.x+"i")
-                        col.appendChild(input)
-                        row.appendChild(col)
-                        span = document.createElement("span"); span.innerHTML = "italic ";col.append(span);
+                        var span = createNewElement(col,"span",{}); 
+                        span.innerHTML = " italic";
 
 
                         //check underline
-                        col = document.createElement("div")
-                        col.setAttribute("class","col-sm-1")
-                        input = document.createElement("input")
-                        input.setAttribute("class","form-check-input")
+                        col = createNewElement(row,"div",{class:"col-sm-1"})
+                        var input = createNewElement(col,"input",{value:heading.h.sz,type:"checkbox",class:"form-check-input",id:heading.x+"u"})
                         if (heading.h.u) {
                             input.setAttribute("checked",true)
                         }
-                        input.setAttribute("type","checkbox")
-                        input.setAttribute("id",heading.x+"u")
-                        col.appendChild(input)
-                        row.appendChild(col)
-                        span = document.createElement("span"); span.innerHTML = "underline ";col.append(span);
+                        var span = createNewElement(col,"span",{}); 
+                        span.innerHTML = " undln";
+
 
                         document.getElementById("frm").insertBefore(row,rowname)
                     });
@@ -727,7 +703,11 @@
     <div class="container" id="frm" class="form-control">
         <div>
             <h1>Create a reference docx</h1>
+            <p>Everything is defined in points. To convert cm to points, multiply with ±28.3465</p>
+            <p>In the magicbox, you can copy random text with hex codes for colors. It will pick up the color in chronological folder. Notice that every run reparses the order
+            </p>
         </div>
+        
         <div class="row  mt-2">
             <div class="col-sm-3" >
                 <span class="form-label">Magic Box</span>
@@ -749,6 +729,17 @@ font: Arial
         </div>
         <div class="row mt-2" id="rowname">
             <div class="col-sm-4" >
+                <span class="form-label">PT Multi, multiply values below with 20 (def) or 1</span>
+              </div>
+              <div class="col-sm-1">
+                <select id="ptmulti" onchange="swPt()" class="form-select" >
+                    <option value="20" selected>20</option>
+                    <option value="1">1</option>
+                </select>
+              </div>
+        </div>
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
                 <span class="form-label">Font burn in</span>
               </div>
               <div class="col-sm-1">
@@ -763,7 +754,7 @@ font: Arial
                 <input type="checkbox" id="titlebeforeUpdate" class="form-check-input" checked>
               </div>
               <div class="col-sm-1">
-                <input type="number" id="titlebefore" class="form-input" value="200">
+                <input type="number" id="titlebefore" class="form-control" value="200">
               </div>
         </div>
         <div class="row mt-2" id="rowname">
@@ -793,18 +784,72 @@ font: Arial
               </div>
 
         </div>
-        
+        <!--http://officeopenxml.com/WPsection.php-->
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Doc Size (WxH) pgSz in pt (*20)</span>
+              </div>
+              <div class="col-sm-1">
+                <select id="docSizeFormat" class="form-select" onchange="szSel()">
+                    <option value="11906x16838x0" selected>A4</option>
+                    <option value="12240x15840x0">US</option>
+                </select>
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeW" class="form-control" value="595.3">
+              </div>
+              <div class="col-sm-1">
+                <input type="button" class="btn btn-primary" value="&lt;&gt;" onclick="sw();"/>
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeH" class="form-control" value="841.9">
+              </div>
+              <div class="col-sm-1">
+                <select id="docSizeO" class="form-select" >
+                    <option value="portrait" selected>Portrait</option>
+                    <option value="landscape">Landscape</option>
+                </select>
+              </div>
+        </div>
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Margin in pt (Top,Bottom,Left,Right) (*20)</span>
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeMT" class="form-control" value="72">
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeMB" class="form-control" value="72">
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeML" class="form-control" value="72">
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeMR" class="form-control" value="72">
+              </div>
+        </div>
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Header, Footer in pt (Top,Bottom) (*20)</span>
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeMH" class="form-control" value="36">
+              </div>
+              <div class="col-sm-1">
+                <input type="number" id="docSizeMF" class="form-control" value="36">
+              </div>
+        </div>
         <div class="row mt-2" >
             <div class="col-sm-4" >
-                <span class="form-label">set file name</span>
+                <span class="form-label">Set file name</span>
               </div>
               <div class="col-sm-2">
-                <input type="text" id="filename-input" class="form-input" value="reference-{u}.docx">
+                <input type="text" id="filename-input" class="form-control" value="reference-{u}.docx">
               </div>
         </div>
         <div class="row mt-2">
             <div class="col-sm-4" >
-                <span class="form-label">create the docx file</span>
+                <span class="form-label">Create the docx file</span>
               </div>
               <div class="col-sm-2">
                 <input type="button" id="create-button" class="btn btn-primary" value="Create" ></input>
