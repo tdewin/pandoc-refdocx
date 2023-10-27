@@ -17,11 +17,12 @@
 
         document.getElementById("create-button").addEventListener("click", function() {
             var dlcontainer = document.getElementById("dlcontainer")
-            var links = dlcontainer.getElementsByClassName("downloadlink")
-          
             while(dlcontainer.firstChild) {
                 dlcontainer.removeChild(dlcontainer.lastChild)
             }
+            var t = document.createElement("span")
+            t.innerHtml = "Generating ...<br>"
+            dlcontainer.appendChild(t)
 
             getZipFileBlob().then(downloadFile);
         });
@@ -49,10 +50,23 @@
             "word/_rels/footnotes.xml.rels",
             ]
 
+          var parralelFetch = {}
           var promlist = []
+
           for (let index = 0; index < flist.length; index++) {
             const element = flist[index];
-            const response = await fetch("./src/"+element)
+            var p = fetch("./src/"+element)
+            promlist.push(p)
+            parralelFetch[element] = p
+            
+          }
+          Promise.all(promlist)
+
+          promlist = []
+          for (let index = 0; index < flist.length; index++) {
+            const element = flist[index];
+            //console.log(element)
+            const response = await parralelFetch[element]
             const body = await response.text()
 
             promlist.push(zipWriter.add(element, new TextReader(body)))
@@ -85,12 +99,13 @@
             //console.log(cel)
           }
 
-          let fonts = document.getElementsByClassName("themefont");
+         
+          let fonts = ["majorFont","minorFont"].map(n=> document.getElementById(n))
           for (let i = 0; i < fonts.length; i++) {
             const c = fonts[i]
             //console.log(c.id,c.value)
 
-
+            //console.log(c)
             //<a:majorFont>
             //<a:latin typeface="Calibri" />
             var h = xmlDoc.getElementsByTagName("a:"+c.id)[0]
@@ -99,7 +114,8 @@
 
             //console.log(h)
           }
-
+          let allfonts = document.getElementsByClassName("themefont")
+          
         
           const themeupd = new XMLSerializer().serializeToString(xmlDoc)
           //console.log(themeupd)
@@ -110,11 +126,18 @@
           var xmlDoc = parser.parseFromString(bodySt,"text/xml");
 
           let headings = [1,2,3,4,5,6,7,8,9].map((v)=> "Heading"+v)
-          headings.push("BodyText")
+          headings.push("BodyText","Author","Title","Subtitle","Date","VerbatimChar","Abstract","AbstractTitle","TOCHeading")
           let styles = xmlDoc.getElementsByTagName("w:style")
 
 
           headings.forEach(h=> {
+            //1 is minorfont, 2 is majorfont for headings
+            var bf = fonts[1].value
+            if (h.length > 7 && h.substring(0,7) == "Heading") {
+                bf = fonts[0].value
+            }
+
+
              var style = null
              for(let i = 0;i <styles.length;i++) {
                 const s = styles[i]
@@ -132,8 +155,16 @@
                     style.appendChild(rpr)
                 }
 
-
-                var rm = ["w:color","w:sz","w:szCs","w:b","w:bCs","w:i","w:iCs"]
+                var pprs = style.getElementsByTagName("w:pPr")
+                var ppr = null
+                if (pprs.length > 0) {
+                    ppr = pprs[0]
+                } else {
+                    ppr = xmlDoc.createElement("w:pPr")
+                    style.appendChild(ppr)
+                }
+                
+                var rm = ["w:color","w:sz","w:szCs","w:b","w:bCs","w:i","w:iCs","w:u"]
                 rm.forEach((r)=>{
                     var q = rpr.getElementsByTagName(r)
                     if (q.length > 0) {
@@ -180,6 +211,55 @@
                     i = xmlDoc.createElement("w:iCs")
                     rpr.appendChild(i)
                 }
+
+                const uc = document.getElementById(h+"u").checked
+                
+                if (uc) {
+                    var u = xmlDoc.createElement("w:u")
+                    u.setAttribute("w:val","single")
+                    
+                    rpr.appendChild(u)
+                }
+
+                const jc  = document.getElementById(h+"j").value
+                if (jc != "default") {
+                    var wjcs = ppr.getElementsByTagName("w:jc")
+                
+                    if (wjcs.length > 0) {
+                        wjcs[0].setAttribute("w:val",jc)
+                    } else {
+                        var wjc = xmlDoc.createElement("w:jc")
+                        wjc.setAttribute("w:val",jc)
+                        ppr.appendChild(wjc)
+                    }
+
+                    /*var spacing = ppr.getElementsByTagName("w:spacing")
+                    if (spacing.length > 0) {
+                        spacing[0].setAttribute("w:before",0)
+                        spacing[0].setAttribute("w:after",0)
+                    } */
+
+                }
+                
+                const fbi = (document.getElementById("fontburnin").checked || document.getElementById(h+"font").value != "default" )
+                if (fbi) {
+                    if (document.getElementById(h+"font").value != "default") {
+                        bf = document.getElementById(document.getElementById(h+"font").value).value
+                    }
+
+                    var q = rpr.getElementsByTagName("w:rFonts")
+                    if (q.length > 0) {
+                        rpr.removeChild(q[0])
+                    }
+                    
+                    var f = xmlDoc.createElement("w:rFonts")
+                    f.setAttribute("w:ascii",bf)
+                    f.setAttribute("w:hAnsi",bf)
+                    f.setAttribute("w:cs",bf)
+                    f.setAttribute("w:eastAsiaTheme","majorEastAsia")
+                    rpr.appendChild(f)
+                    //console.log("bbbbbbuuuurn",bf)
+                }
                 //console.log(style)
 
              } else {
@@ -200,17 +280,22 @@
         
          function downloadFile(blob) {
             var dlcontainer = document.getElementById("dlcontainer")
-            var  links = dlcontainer.getElementsByClassName("downloadlink")
-          
-            for (let i = 0; i < links.length; i++) {
-                dlcontainer.removeChild(links[i])
+            while(dlcontainer.firstChild) {
+                dlcontainer.removeChild(dlcontainer.lastChild)
             }
+            
+            const fname = document.getElementById("filename-input").value.replace("{u}",parseInt((Date.now()/1000)))
+
             dlcontainer.appendChild(Object.assign(document.createElement("a"), {
-                download: document.getElementById("filename-input").value,
+                download: fname,
                 href: URL.createObjectURL(blob),
                 textContent: "Download docx file",
                 className: "downloadlink",
             }));
+
+            var howto = document.createElement("div")
+            howto.innerHTML = "<br>Usage:<br><pre>echo '---\\ntitle: Test Document\\ndate: 2024\\nauthor: Author\\n---\\n# Title\\n## Title 2\\nSome content' > test.md\npandoc -o mydoc.docx --highlight-style=monochrome --toc=true --toc-depth=3 --reference-doc="+fname+" test.md</pre>"
+            dlcontainer.appendChild(howto)
         }
 
        
@@ -311,14 +396,17 @@
                     fonts = [
                         {x:"majorFont",l:"Major Font",h:"Tahoma"},
                         {x:"minorFont",l:"Minor Font",h:"Tahoma"},
+                        {x:"BurnFont1",l:"Custom Font 1",h:"Verdana"},
+                        {x:"BurnFont2",l:"Custom Font 2",h:"Consolas"},
+                        {x:"BurnFont3",l:"Custom Font 3",h:"Cascadia Code"},
                     ]
-
+                    //Font list
                     fonts.forEach(font => {
                         var row = document.createElement("div")
                         row.setAttribute("class","row")
 
                         var col = document.createElement("div")
-                        col.setAttribute("class","col-md-3")
+                        col.setAttribute("class","col-md-3 form-group")
 
                         var span = document.createElement("span")
                         span.innerHTML = font.l+"&nbsp;"
@@ -333,7 +421,7 @@
                         var input = document.createElement("input")
                         input.setAttribute("value",font.h)
                         input.setAttribute("type","text")
-                        input.setAttribute("class","themefont")
+                        input.setAttribute("class","themefont form-input")
                         input.setAttribute("id",font.x)
 
                         col.appendChild(input)
@@ -344,15 +432,23 @@
 
                     headings = [
                         {x:"BodyText",l:"BodyText",h:{sz:11,color:"dk1",b:false,i:false}},
+                        {x:"Title",l:"Title",h:{sz:30,color:"dk1",b:false,i:false}},
+                        {x:"Subtitle",l:"Subtitle",h:{sz:16,color:"dk1",b:false,i:false}},
+                        {x:"Author",l:"Author",h:{sz:11,color:"dk1",b:false,i:false}},
+                        {x:"Date",l:"Date",h:{sz:11,color:"dk1",b:false,i:false}},
+                        {x:"VerbatimChar",l:"VerbatimChar",h:{sz:11,color:"accent1",b:false,i:false,f:"BurnFont2"}},
+                        {x:"AbstractTitle",l:"AbstractTitle",h:{sz:11,color:"dk1",b:false,i:false}},
+                        {x:"Abstract",l:"Abstract",h:{sz:14,color:"dk1",b:false,i:false}},
                         {x:"Heading1",l:"Heading 1",h:{sz:45,color:"dk1",b:false,i:false}},
                         {x:"Heading2",l:"Heading 2",h:{sz:36,color:"dk1",b:false,i:false}},
                         {x:"Heading3",l:"Heading 3",h:{sz:23,color:"accent1",b:false,i:false}},
                         {x:"Heading4",l:"Heading 4",h:{sz:20,color:"accent1",b:false,i:false}},
                         {x:"Heading5",l:"Heading 5",h:{sz:16,color:"accent1",b:false,i:false}},
-                        {x:"Heading6",l:"Heading 6",h:{sz:13,color:"accent1",b:true,i:false}},
+                        {x:"Heading6",l:"Heading 6",h:{sz:13,color:"accent1",b:false,i:false}},
                         {x:"Heading7",l:"Heading 7",h:{sz:13,color:"accent1",b:false,i:false}},
-                        {x:"Heading8",l:"Heading 8",h:{sz:12,color:"accent1",b:true,i:false}},
+                        {x:"Heading8",l:"Heading 8",h:{sz:12,color:"accent1",b:false,i:false}},
                         {x:"Heading9",l:"Heading 9",h:{sz:12,color:"accent1",b:false,i:false}},
+                        {x:"TOCHeading",l:"TOC Heading",h:{sz:45,color:"accent1",b:false,i:false}},
                     ]
 
                     headings.forEach(heading=> {
@@ -360,7 +456,7 @@
                         row.setAttribute("class","row")
 
                         var col = document.createElement("div")
-                        col.setAttribute("class","col-sm-3")
+                        col.setAttribute("class","col-sm-2 form-group")
 
                         var span = document.createElement("span")
                         span.innerHTML = heading.l+"&nbsp;"
@@ -369,22 +465,27 @@
                         col.appendChild(span)
                         row.appendChild(col)
 
+
+                        //size
                         col = document.createElement("div")
-                        col.setAttribute("class","col-sm-2")
+                        col.setAttribute("class","col-sm-1")
 
                         var input = document.createElement("input")
                         input.setAttribute("value",heading.h.sz)
-                        input.setAttribute("type","text")
+                        input.setAttribute("type","number")
                         input.setAttribute("id",heading.x+"sz")
+                        input.setAttribute("class","form-control")
                         col.appendChild(input)
                         row.appendChild(col)
                         
 
+                        // Colors
                         col = document.createElement("div")
                         col.setAttribute("class","col-sm-2")
                         var selcol = document.createElement("select")
                         
                         selcol.setAttribute("id",heading.x+"color")
+                        selcol.setAttribute("class","form-control")
                         colors.forEach(c=> {
                             var opt = document.createElement("option")
                             opt.setAttribute("value",c.x)
@@ -397,11 +498,64 @@
                         col.appendChild(selcol)
                         row.appendChild(col)
 
+                        // Fonts
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-2")
+                        var selcol = document.createElement("select")
+                        
+                        selcol.setAttribute("id",heading.x+"font")
+                        selcol.setAttribute("class","form-control")
+                        var opt = document.createElement("option")
+                        opt.setAttribute("value","default")
+                        if (heading.h.f === undefined) {
+                            opt.setAttribute("selected",true)
+                        }
+                        opt.innerText = "Default"
+                        selcol.appendChild(opt)
+                        fonts.forEach(f=> {
+                            var opt = document.createElement("option")
+                            opt.setAttribute("value",f.x)
+                            opt.innerText = f.l
+                            selcol.appendChild(opt)
+                            if (heading.h.f !== undefined && f.x == heading.h.f) {
+                                opt.setAttribute("selected",true)
+                            }
+                        })
+                        col.appendChild(selcol)
+                        row.appendChild(col)
+
+
+                        // Justify
+                        //http://officeopenxml.com/WPalignment.php
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-2")
+                        var selcol = document.createElement("select")
+                        
+                        selcol.setAttribute("id",heading.x+"j")
+                        selcol.setAttribute("class","form-control")
+                        const sel = "default"
+                        const list = ["default","start","end","center","both","distribute"]
+                        list.forEach(f=> {
+                            var opt = document.createElement("option")
+                            if(f == sel) {
+                                opt.setAttribute("selected",(sel == f))
+                            }
+                            opt.setAttribute("value",f)
+                            opt.innerText = f
+                            selcol.appendChild(opt)
+                        })
+                        col.appendChild(selcol)
+                        row.appendChild(col)
+
+
+                        //check bold
+
                         col = document.createElement("div")
                         col.setAttribute("class","col-sm-1")
 
-                        span = document.createElement("span"); span.innerHTML = "bold ";col.append(span);
+                        
                         input = document.createElement("input")
+                        input.setAttribute("class","form-check-input")
                         if (heading.h.b) {
                             input.setAttribute("checked",true)
                         }
@@ -409,12 +563,13 @@
                         input.setAttribute("id",heading.x+"b")
                         col.appendChild(input)
                         row.appendChild(col)
+                        span = document.createElement("span"); span.innerHTML = "bold ";col.append(span);
 
+                        //check italic
                         col = document.createElement("div")
                         col.setAttribute("class","col-sm-1")
-
-                        span = document.createElement("span"); span.innerHTML = "italic ";col.append(span);
                         input = document.createElement("input")
+                        input.setAttribute("class","form-check-input")
                         if (heading.h.i) {
                             input.setAttribute("checked",true)
                         }
@@ -422,10 +577,72 @@
                         input.setAttribute("id",heading.x+"i")
                         col.appendChild(input)
                         row.appendChild(col)
+                        span = document.createElement("span"); span.innerHTML = "italic ";col.append(span);
+
+
+                        //check underline
+                        col = document.createElement("div")
+                        col.setAttribute("class","col-sm-1")
+                        input = document.createElement("input")
+                        input.setAttribute("class","form-check-input")
+                        if (heading.h.u) {
+                            input.setAttribute("checked",true)
+                        }
+                        input.setAttribute("type","checkbox")
+                        input.setAttribute("id",heading.x+"u")
+                        col.appendChild(input)
+                        row.appendChild(col)
+                        span = document.createElement("span"); span.innerHTML = "underline ";col.append(span);
 
                         document.getElementById("frm").insertBefore(row,rowname)
                     });
                     
+                }
+
+                function extract() {
+                    const c = ["dk1","lt1","dk2","lt2","accent1","accent2","accent3","accent4","accent5","accent6","hlink","folHlink"]
+                    const hexcode = /#[0-9a-fA-F]{6}/mg;
+                    var proc = document.getElementById("magicarea").value
+                    var refresh = []
+                    
+                    var hexmatch = proc.match(hexcode)
+                    if (hexmatch) {
+                        hexmatch.forEach((v,i)=>{
+                            if (i < c.length) {
+                                document.getElementById(c[i]).value = v
+                            }
+                            
+                            refresh.push(v+"  // "+c[i])
+                        })
+                       
+                    }
+
+
+                    const fonts = ["majorFont","minorFont","BurnFont1","BurnFont2","BurnFont3"]
+                    const fontcode = /^font[:] ([^\n]+)$/mg
+                    var fontmatch = proc.matchAll(fontcode)
+
+                    if (fontmatch) {
+                        var i = 0
+                        for (result of fontmatch) {
+                            if (i < fonts.length) {
+                                document.getElementById(fonts[i++]).value = result[1]
+                            }
+                            refresh.push(result[0])
+                        }
+                    }
+
+                    
+                    const headingsSZ = /^sz[:] ([A-Za-z0-9]+) ([0-9]+)$/mg
+                    var headingmatch = proc.matchAll(headingsSZ)
+                    if (headingmatch) {
+                        for (result of headingmatch) {
+                            document.getElementById(result[1]+"sz").value = result[2]
+                            refresh.push(result[0])
+                        }
+                        
+                    }
+                    document.getElementById("magicarea").value = refresh.join("\n")
                 }
             </script>
 </head>
@@ -436,15 +653,42 @@
         <div>
             <h1>Create a reference docx</h1>
         </div>
+        <div class="row">
+            <div class="col-sm-3" >
+                <span class="form-label">Magic Box</span>
+              </div>
+              <div class="col-sm-1">
+                <input type="button" value="Extract Presets" onclick="extract()" id="magic">
+              </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 form-control" >
+                <textarea id="magicarea" rows="5" class="form-control">some text: color1 #333333 
+color 2 #eeeeee
+sz: Heading1 55
+sz: BodyText 12
+font: Verdana
+font: Arial
+</textarea>
+            </div>
+        </div>
         <div class="row" id="rowname">
+            <div class="col-md-3" >
+                <span class="form-label">Font burn in</span>
+              </div>
+              <div class="col">
+                <input type="checkbox" id="fontburnin" checked>
+              </div>
+        </div>
+        <div class="row" >
             <div class="col-md-3" >
                 <span class="form-label">set file name</span>
               </div>
               <div class="col">
-                <input type="text" id="filename-input" value="reference.docx">
+                <input type="text" id="filename-input" value="reference-{u}.docx">
               </div>
         </div>
-        <div class="row" id="rowname">
+        <div class="row">
             <div class="col-md-3" >
                 <span class="form-label">create the docx file</span>
               </div>

@@ -40,3 +40,9 @@ upload to a server or use go to run a static server
 go run staticserver.go 
 ```
 
+
+# Analyzing on the fly
+requires xmlstarlet; but more allows for searching like vi (eg esc+/+pattern)
+```bash
+unzip -p reference.docx word/styles.xml | xmlstarlet fo | more
+```
