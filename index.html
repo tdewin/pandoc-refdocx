@@ -206,8 +206,7 @@
           const bodySt = await responseSt.text()
           var xmlDoc = parser.parseFromString(bodySt,"text/xml");
 
-          let headings = [1,2,3,4,5,6,7,8,9].map((v)=> "Heading"+v)
-          headings.push("BodyText","Author","Title","Subtitle","Date","VerbatimChar","Abstract","AbstractTitle","TOCHeading")
+          
           let styles = xmlDoc.getElementsByTagName("w:style")
 
           let allstyles = {}
@@ -234,6 +233,8 @@
           pageBreakBefore("AbstractTitle","abstractpagebreakUpdate")
         
 
+          let headings = [1,2,3,4,5,6,7,8,9].map((v)=> "Heading"+v)
+          headings.push("BodyText","Author","Title","Subtitle","Date","VerbatimChar","Abstract","AbstractTitle","TOCHeading","Hyperlink")
 
           headings.forEach(h=> {
             //1 is minorfont, 2 is majorfont for headings
@@ -531,13 +532,15 @@
 
                     headings = [
                         {x:"BodyText",l:"BodyText",h:{sz:11,color:"dk1",b:false,i:false}},
+
                         {x:"Title",l:"Title",h:{sz:30,color:"dk1",b:false,i:false,jc:"start"}},
                         {x:"Subtitle",l:"Subtitle",h:{sz:16,color:"dk1",b:false,i:false,jc:"start"}},
                         {x:"Author",l:"Author",h:{sz:11,color:"dk1",b:false,i:false,jc:"start"}},
                         {x:"Date",l:"Date",h:{sz:11,color:"dk1",b:false,i:false,jc:"start"}},
-                        {x:"VerbatimChar",l:"VerbatimChar",h:{sz:11,color:"accent1",b:false,i:false,f:"BurnFont2"}},
+                        
                         {x:"AbstractTitle",l:"AbstractTitle",h:{sz:16,color:"dk1",b:true,i:false,jc:"start"}},
                         {x:"Abstract",l:"Abstract",h:{sz:14,color:"dk1",b:false,i:false,jc:"start"}},
+                        
                         {x:"Heading1",l:"Heading 1",h:{sz:45,color:"dk1",b:false,i:false}},
                         {x:"Heading2",l:"Heading 2",h:{sz:36,color:"dk1",b:false,i:false}},
                         {x:"Heading3",l:"Heading 3",h:{sz:23,color:"accent1",b:false,i:false}},
@@ -548,6 +551,9 @@
                         {x:"Heading8",l:"Heading 8",h:{sz:12,color:"accent1",b:false,i:false}},
                         {x:"Heading9",l:"Heading 9",h:{sz:12,color:"accent1",b:false,i:false}},
                         {x:"TOCHeading",l:"TOC Heading",h:{sz:45,color:"accent1",b:false,i:false}},
+
+                        {x:"VerbatimChar",l:"VerbatimChar",h:{sz:11,color:"accent1",b:false,i:false,f:"BurnFont2"}},
+                        {x:"Hyperlink",l:"Hyperlink",h:{sz:11,color:"accent6",b:false,i:false}},
                     ]
 
                     headings.forEach(heading=> {
