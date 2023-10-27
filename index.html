@@ -129,6 +129,90 @@
           headings.push("BodyText","Author","Title","Subtitle","Date","VerbatimChar","Abstract","AbstractTitle","TOCHeading")
           let styles = xmlDoc.getElementsByTagName("w:style")
 
+          let allstyles = {}
+          for(let i = 0;i <styles.length;i++) {
+                const s = styles[i]
+                allstyles[s.getAttribute("w:styleId")] = s
+          }
+        
+          if (allstyles["Title"] && document.getElementById("titlebeforeUpdate").checked) {
+            var pprs = allstyles["Title"].getElementsByTagName("w:pPr")
+            var ppr = null
+
+            if (pprs.length > 0) {
+                    ppr = pprs[0]
+            } else {
+                ppr = xmlDoc.createElement("w:pPr")
+                style.appendChild(ppr)
+            }
+
+            var spacings = ppr.getElementsByTagName("w:spacing")
+            var spacing = null
+            if (spacings.length > 0) {
+                spacing = spacings[0]
+            } else {
+                var spacing = xmlDoc.createElement("w:spacing")
+                ppr.appendChild(spacing)
+            }
+            spacing.setAttribute("w:before",parseInt(document.getElementById("titlebefore").value)*20)
+          }
+
+          if(allstyles["TOCHeading"] && document.getElementById("tocpagebreakUpdate").checked ) {
+            var pprs = allstyles["TOCHeading"].getElementsByTagName("w:pPr")
+            var ppr = null
+
+            if (pprs.length > 0) {
+                    ppr = pprs[0]
+            } else {
+                ppr = xmlDoc.createElement("w:pPr")
+                style.appendChild(ppr)
+            }
+
+            var pbbs = ppr.getElementsByTagName("w:pageBreakBefore")
+            if (pbbs.length == 0) {
+                var pbb = xmlDoc.createElement("w:pageBreakBefore")
+                ppr.appendChild(pbb)
+            }
+            
+          }
+
+          if(allstyles["Heading1"] && document.getElementById("h1pagebreakUpdate").checked ) {
+            var pprs = allstyles["Heading1"].getElementsByTagName("w:pPr")
+            var ppr = null
+
+            if (pprs.length > 0) {
+                    ppr = pprs[0]
+            } else {
+                ppr = xmlDoc.createElement("w:pPr")
+                style.appendChild(ppr)
+            }
+
+            var pbbs = ppr.getElementsByTagName("w:pageBreakBefore")
+            if (pbbs.length == 0) {
+                var pbb = xmlDoc.createElement("w:pageBreakBefore")
+                ppr.appendChild(pbb)
+            }
+            
+          }
+
+          if(allstyles["AbstractTitle"] && document.getElementById("abstractpagebreakUpdate").checked ) {
+            var pprs = allstyles["AbstractTitle"].getElementsByTagName("w:pPr")
+            var ppr = null
+
+            if (pprs.length > 0) {
+                    ppr = pprs[0]
+            } else {
+                ppr = xmlDoc.createElement("w:pPr")
+                style.appendChild(ppr)
+            }
+
+            var pbbs = ppr.getElementsByTagName("w:pageBreakBefore")
+            if (pbbs.length == 0) {
+                var pbb = xmlDoc.createElement("w:pageBreakBefore")
+                ppr.appendChild(pbb)
+            }
+            
+          }
 
           headings.forEach(h=> {
             //1 is minorfont, 2 is majorfont for headings
@@ -138,13 +222,8 @@
             }
 
 
-             var style = null
-             for(let i = 0;i <styles.length;i++) {
-                const s = styles[i]
-                if (s.getAttribute("w:styleId") == h) {
-                    style = s
-                } 
-             }
+             var style = allstyles[h]
+             
              if (style != null) {
                 var rprs = style.getElementsByTagName("w:rPr")
                 var rpr = null
@@ -241,6 +320,7 @@
 
                 }
                 
+                
                 const fbi = (document.getElementById("fontburnin").checked || document.getElementById(h+"font").value != "default" )
                 if (fbi) {
                     if (document.getElementById(h+"font").value != "default") {
@@ -294,7 +374,7 @@
             }));
 
             var howto = document.createElement("div")
-            howto.innerHTML = "<br>Usage:<br><pre>echo '---\\ntitle: Test Document\\ndate: 2024\\nauthor: Author\\n---\\n# Title\\n## Title 2\\nSome content' > test.md\npandoc -o mydoc.docx --highlight-style=monochrome --toc=true --toc-depth=3 --reference-doc="+fname+" test.md</pre>"
+            howto.innerHTML = "<br>Usage:<br><pre>echo '---\\ntitle: Test Document\\ndate: 2024\\nauthor: Author\\n---\\n# Title\\n## Sub Title 1 \\nSome content\\n\\n# Title 2\\n## Sub Title 2 \\nSome content' > test.md\npandoc -o mydoc.docx --highlight-style=monochrome --toc=true --toc-depth=3 --reference-doc="+fname+" test.md</pre>"
             dlcontainer.appendChild(howto)
         }
 
@@ -357,17 +437,10 @@
                         {x:"hlink",l:"Link",h:HSLToHex((240),80,50)},
                         {x:"folHlink",l:"Follow Link",h:HSLToHex((280),80,50)},
                     ]
-/*<div class="row" id="rowname">
-    <div class="col-md-3" >
-                <span class="form-label">set file name</span>
-              </div>
-              <div class="col">
-                <input type="text" id="filename-input" value="reference.docx">
-              </div>
-        </div>*/
+
                     colors.forEach(color => {
                         var row = document.createElement("div")
-                        row.setAttribute("class","row")
+                        row.setAttribute("class","row mt-2")
 
                         var col = document.createElement("div")
                         col.setAttribute("class","col-md-3")
@@ -403,7 +476,7 @@
                     //Font list
                     fonts.forEach(font => {
                         var row = document.createElement("div")
-                        row.setAttribute("class","row")
+                        row.setAttribute("class","row mt-2")
 
                         var col = document.createElement("div")
                         col.setAttribute("class","col-md-3 form-group")
@@ -432,13 +505,13 @@
 
                     headings = [
                         {x:"BodyText",l:"BodyText",h:{sz:11,color:"dk1",b:false,i:false}},
-                        {x:"Title",l:"Title",h:{sz:30,color:"dk1",b:false,i:false}},
-                        {x:"Subtitle",l:"Subtitle",h:{sz:16,color:"dk1",b:false,i:false}},
-                        {x:"Author",l:"Author",h:{sz:11,color:"dk1",b:false,i:false}},
-                        {x:"Date",l:"Date",h:{sz:11,color:"dk1",b:false,i:false}},
+                        {x:"Title",l:"Title",h:{sz:30,color:"dk1",b:false,i:false,jc:"start"}},
+                        {x:"Subtitle",l:"Subtitle",h:{sz:16,color:"dk1",b:false,i:false,jc:"start"}},
+                        {x:"Author",l:"Author",h:{sz:11,color:"dk1",b:false,i:false,jc:"start"}},
+                        {x:"Date",l:"Date",h:{sz:11,color:"dk1",b:false,i:false,jc:"start"}},
                         {x:"VerbatimChar",l:"VerbatimChar",h:{sz:11,color:"accent1",b:false,i:false,f:"BurnFont2"}},
-                        {x:"AbstractTitle",l:"AbstractTitle",h:{sz:11,color:"dk1",b:false,i:false}},
-                        {x:"Abstract",l:"Abstract",h:{sz:14,color:"dk1",b:false,i:false}},
+                        {x:"AbstractTitle",l:"AbstractTitle",h:{sz:16,color:"dk1",b:true,i:false,jc:"start"}},
+                        {x:"Abstract",l:"Abstract",h:{sz:14,color:"dk1",b:false,i:false,jc:"start"}},
                         {x:"Heading1",l:"Heading 1",h:{sz:45,color:"dk1",b:false,i:false}},
                         {x:"Heading2",l:"Heading 2",h:{sz:36,color:"dk1",b:false,i:false}},
                         {x:"Heading3",l:"Heading 3",h:{sz:23,color:"accent1",b:false,i:false}},
@@ -453,7 +526,7 @@
 
                     headings.forEach(heading=> {
                         var row = document.createElement("div")
-                        row.setAttribute("class","row")
+                        row.setAttribute("class","row mt-2")
 
                         var col = document.createElement("div")
                         col.setAttribute("class","col-sm-2 form-group")
@@ -533,8 +606,10 @@
                         
                         selcol.setAttribute("id",heading.x+"j")
                         selcol.setAttribute("class","form-control")
-                        const sel = "default"
+                        const sel = (heading.h.jc)?heading.h.jc:"default"
                         const list = ["default","start","end","center","both","distribute"]
+                        
+                    
                         list.forEach(f=> {
                             var opt = document.createElement("option")
                             if(f == sel) {
@@ -649,11 +724,11 @@
   <body onload="load();">
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-    <div class="container" id="frm">
+    <div class="container" id="frm" class="form-control">
         <div>
             <h1>Create a reference docx</h1>
         </div>
-        <div class="row">
+        <div class="row  mt-2">
             <div class="col-sm-3" >
                 <span class="form-label">Magic Box</span>
               </div>
@@ -661,8 +736,8 @@
                 <input type="button" value="Extract Presets" onclick="extract()" id="magic">
               </div>
         </div>
-        <div class="row">
-            <div class="col-md-12 form-control" >
+        <div class="row  mt-2">
+            <div class="col-md-12" >
                 <textarea id="magicarea" rows="5" class="form-control">some text: color1 #333333 
 color 2 #eeeeee
 sz: Heading1 55
@@ -672,35 +747,74 @@ font: Arial
 </textarea>
             </div>
         </div>
-        <div class="row" id="rowname">
-            <div class="col-md-3" >
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
                 <span class="form-label">Font burn in</span>
               </div>
-              <div class="col">
-                <input type="checkbox" id="fontburnin" checked>
+              <div class="col-sm-1">
+                <input type="checkbox" id="fontburnin" class="form-check-input" checked>
               </div>
         </div>
-        <div class="row" >
-            <div class="col-md-3" >
-                <span class="form-label">set file name</span>
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Title offset from top pt (w:spacing before)</span>
               </div>
-              <div class="col">
-                <input type="text" id="filename-input" value="reference-{u}.docx">
+              <div class="col-sm-1">
+                <input type="checkbox" id="titlebeforeUpdate" class="form-check-input" checked>
               </div>
-        </div>
-        <div class="row">
-            <div class="col-md-3" >
-                <span class="form-label">create the docx file</span>
-              </div>
-              <div class="col">
-                <button id="create-button" >Create</button>
+              <div class="col-sm-1">
+                <input type="number" id="titlebefore" class="form-input" value="200">
               </div>
         </div>
-        <div style="margin: 20px;"></div>
-        <div id="dlcontainer">
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Pagebreak for TOC ( w:pageBreakBefore )</span>
+              </div>
+              <div class="col-sm-1">
+                <input type="checkbox" id="tocpagebreakUpdate" class="form-check-input" checked>
+              </div>
 
         </div>
-        <div>
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Pagebreak for Abstract ( w:pageBreakBefore )</span>
+              </div>
+              <div class="col-sm-1">
+                <input type="checkbox" id="abstractpagebreakUpdate" class="form-check-input" checked>
+              </div>
+
+        </div>
+        <div class="row mt-2" id="rowname">
+            <div class="col-sm-4" >
+                <span class="form-label">Pagebreak for Heading 1 ( w:pageBreakBefore )</span>
+              </div>
+              <div class="col-sm-1">
+                <input type="checkbox" id="h1pagebreakUpdate" class="form-check-input" checked>
+              </div>
+
+        </div>
+        
+        <div class="row mt-2" >
+            <div class="col-sm-4" >
+                <span class="form-label">set file name</span>
+              </div>
+              <div class="col-sm-2">
+                <input type="text" id="filename-input" class="form-input" value="reference-{u}.docx">
+              </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-sm-4" >
+                <span class="form-label">create the docx file</span>
+              </div>
+              <div class="col-sm-2">
+                <input type="button" id="create-button" class="btn btn-primary" value="Create" ></input>
+              </div>
+        </div>
+        <div class="mt-2"></div>
+        <div class="mt-2 row" id="dlcontainer">
+
+        </div>
+        <div class="mt-2 row">
             <p>Made with <a href="https://github.com/gildas-lormeau/">zipfs</a></p>
             <p>Fork me on <a href="https://github.com/tdewin/pandoc-refdocx">github.com/tdewin/pandoc-refdocx</a></p>
         </div>
