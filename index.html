@@ -68,11 +68,11 @@
             "word/settings.xml",
             "word/webSettings.xml",
             "word/_rels/document.xml.rels",
-            /*"word/_rels/header1.xml.rels",
-            "word/_rels/header2.xml.rels",
+           //"word/_rels/header1.xml.rels",
+            //"word/_rels/header2.xml.rels",
             "word/header1.xml",
-            "word/header2.xml",
-            */"word/_rels/footnotes.xml.rels",
+            //"word/header2.xml",
+            "word/_rels/footnotes.xml.rels",
             "word/theme/theme1.xml",
             "word/styles.xml",
             ]
@@ -748,8 +748,10 @@
                     const d = szw/40
                     const r = d/2
 
-                    const colormap = colors.map((c,i) => {
-                        return `<circle fill="${c.h}" r="${r}" cx="${-d}" cy="${i*(d+r)+r}"></circle>`
+                    const cids = ["dk1","lt1","dk2","lt2","accent1","accent2","accent3","accent4","accent5","accent6","hlink","folHlink"]
+                   
+                    const colormap = cids.map((cid,i) => {
+                        return `<circle fill="${idVal(cid)}" r="${r}" cx="${-d}" cy="${i*(d+r)+r}"></circle>`
                     }).join("\n")
 
                     var svg = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
